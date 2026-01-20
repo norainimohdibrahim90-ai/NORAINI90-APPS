@@ -1,7 +1,7 @@
 import React from 'react';
 import { DashboardStats, UnitType, OPRData } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { FileText, Calendar, User, Eye, Briefcase, BookOpen, Trophy, Heart, Users } from 'lucide-react';
+import { FileText, Calendar, User, Eye, Briefcase, BookOpen, Trophy, Heart, Users, Star } from 'lucide-react';
 
 interface Props {
   stats: DashboardStats;
@@ -33,6 +33,38 @@ const Dashboard: React.FC<Props> = ({ stats, onViewReport }) => {
       default:
         return <FileText className="w-3 h-3 text-gray-400" />;
     }
+  };
+
+  // Helper to calculate quality rating (1-5 Stars)
+  const calculateRating = (report: OPRData): number => {
+    let score = 1; // Base score
+    
+    // Criteria 1: Status (Submitted gets +1)
+    if (report.status === 'Submitted') score += 1;
+    
+    // Criteria 2: Content Completeness (Images >= 4)
+    if (report.gambar && report.gambar.length >= 4) score += 1;
+    
+    // Criteria 3: Reflection Quality (Length > 50 chars)
+    if (report.refleksi && report.refleksi.length > 50) score += 1;
+    
+    // Criteria 4: Improvement Plan Quality (Length > 50 chars)
+    if (report.penambahbaikan && report.penambahbaikan.length > 50) score += 1;
+
+    return Math.min(score, 5); // Max 5
+  };
+
+  const renderStars = (score: number) => {
+      return (
+          <div className="flex gap-0.5">
+              {[...Array(5)].map((_, i) => (
+                  <Star 
+                    key={i} 
+                    className={`w-3 h-3 ${i < score ? 'fill-yellow-400 text-yellow-400' : 'text-gray-200'}`} 
+                  />
+              ))}
+          </div>
+      );
   };
 
   return (
@@ -100,38 +132,63 @@ const Dashboard: React.FC<Props> = ({ stats, onViewReport }) => {
 
             {/* Recent List */}
             <div className="bg-white p-6 rounded-lg shadow-sm border border-red-100">
-                <h3 className="text-lg font-bold mb-4 text-gray-800">Laporan Terkini</h3>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-lg font-bold text-gray-800">Laporan Terkini</h3>
+                    <div className="text-[10px] text-gray-400 bg-gray-50 px-2 py-1 rounded border">
+                        Skor Kualiti (1-5)
+                    </div>
+                </div>
+                
                 <div className="overflow-y-auto max-h-64 space-y-3">
                     {stats.recentReports.length === 0 ? (
                         <p className="text-gray-500 text-center py-4">Tiada laporan terkini.</p>
                     ) : (
-                        stats.recentReports.map((report, idx) => (
-                            <div key={idx} className="flex items-center gap-3 p-3 bg-brand-softYellow rounded border border-brand-cream hover:bg-yellow-50 transition">
-                                <div className="bg-red-100 p-2 rounded shrink-0">
-                                    <FileText className="w-4 h-4 text-brand-red" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="font-semibold text-sm text-gray-800 truncate">{report.tajukProgram}</p>
-                                    <div className="flex items-center gap-1.5 mt-0.5">
-                                        <div className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-yellow-200 shadow-sm">
-                                            {getUnitIcon(report.unit)}
-                                            <span className="text-xs text-gray-600 font-medium">{report.unit}</span>
+                        stats.recentReports.map((report, idx) => {
+                            const rating = calculateRating(report);
+                            return (
+                                <div key={idx} className="flex items-center gap-3 p-3 bg-brand-softYellow rounded border border-brand-cream hover:bg-yellow-50 transition relative group">
+                                    <div className="bg-red-100 p-2 rounded shrink-0 self-start mt-1">
+                                        <FileText className="w-4 h-4 text-brand-red" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex justify-between items-start">
+                                            <p className="font-semibold text-sm text-gray-800 truncate pr-2" title={report.tajukProgram}>
+                                                {report.tajukProgram}
+                                            </p>
                                         </div>
-                                        <span className="text-xs text-gray-400">•</span>
-                                        <span className="text-xs text-gray-500">{report.tarikh}</span>
+                                        
+                                        {/* Rating Stars */}
+                                        <div className="flex items-center gap-2 mt-1">
+                                            {renderStars(rating)}
+                                            <span className="text-[10px] font-medium text-gray-500">
+                                                {rating}/5
+                                            </span>
+                                        </div>
+
+                                        {/* Meta Info */}
+                                        <div className="flex items-center flex-wrap gap-2 mt-1.5">
+                                            <div className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-yellow-200 shadow-sm">
+                                                {getUnitIcon(report.unit)}
+                                                <span className="text-[10px] text-gray-600 font-medium uppercase">{report.unit || 'UMUM'}</span>
+                                            </div>
+                                            <span className="text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{report.tarikh}</span>
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${report.status === 'Submitted' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>
+                                                {report.status === 'Submitted' ? 'HANTAR' : 'DRAFT'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="self-center pl-1">
+                                        <button 
+                                            onClick={() => onViewReport(report)}
+                                            className="flex items-center gap-1 text-xs bg-white border border-gray-300 px-3 py-1.5 rounded-md hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition shadow-sm"
+                                            title="Lihat Laporan"
+                                        >
+                                            <Eye className="w-3 h-3" />
+                                        </button>
                                     </div>
                                 </div>
-                                <div>
-                                    <button 
-                                        onClick={() => onViewReport(report)}
-                                        className="flex items-center gap-1 text-xs bg-white border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-50 text-gray-700 transition"
-                                        title="Lihat Laporan"
-                                    >
-                                        <Eye className="w-3 h-3" /> Lihat
-                                    </button>
-                                </div>
-                            </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
             </div>
