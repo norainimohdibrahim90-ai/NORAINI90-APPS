@@ -4,10 +4,10 @@ import OPRForm from './components/OPRForm';
 import OPRPreview from './components/OPRPreview';
 import PosterPreview from './components/PosterPreview'; // Import new component
 import Dashboard from './components/Dashboard';
-import { saveReport, getDashboardStats } from './services/storageService';
+import { saveReport, getDashboardStats, uploadReportToCloud } from './services/storageService';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { LayoutDashboard, PlusCircle, ArrowLeft, Download, CheckCircle, Save, FileText, Image as ImageIcon } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, ArrowLeft, Download, CheckCircle, Save, FileText, Image as ImageIcon, Send } from 'lucide-react';
 
 const INITIAL_DATA: OPRData = {
   id: '',
@@ -149,6 +149,47 @@ const App: React.FC = () => {
       showToast("Draft disimpan di dalam browser.");
   };
 
+  const handleSaveOnly = async () => {
+      setIsSaving(true);
+      await saveReport(currentData);
+      showToast("Laporan disimpan sebagai Draft.");
+      setIsSaving(false);
+  };
+
+  const handleSendReport = async () => {
+    setIsSaving(true);
+    
+    // Remember current mode
+    const wasPoster = previewMode === 'poster';
+    
+    // Must be in standard mode to generate the PDF report
+    if (wasPoster) {
+        setPreviewMode('standard');
+        // Wait for render to update visibility
+        await new Promise(resolve => setTimeout(resolve, 300));
+    }
+
+    try {
+        const pdfBase64 = await generatePDFBase64();
+        if (pdfBase64) {
+             const success = await uploadReportToCloud(currentData, pdfBase64);
+             if (success) {
+                 showToast("Laporan berjaya dihantar ke sistem!");
+                 setView('dashboard');
+             }
+        } else {
+            alert("Gagal menjana PDF. Sila cuba lagi.");
+        }
+    } catch (e) {
+        console.error(e);
+        alert("Ralat semasa menghantar laporan.");
+    } finally {
+        setIsSaving(false);
+        // Restore mode if it was changed
+        if (wasPoster) setPreviewMode('poster');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-brand-softYellow font-sans text-slate-900 pb-10">
       {/* Toast Notification */}
@@ -244,6 +285,26 @@ const App: React.FC = () => {
                         </button>
                         
                         <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                            
+                            {/* NEW: Simpan & Hantar Buttons */}
+                            <button 
+                                onClick={handleSaveOnly}
+                                disabled={isSaving}
+                                className="bg-amber-500 hover:bg-amber-600 text-white font-medium py-2 px-4 rounded shadow flex items-center justify-center gap-2 transition w-full md:w-auto"
+                            >
+                                <Save className="w-4 h-4" /> Simpan
+                            </button>
+                            <button 
+                                onClick={handleSendReport}
+                                disabled={isSaving}
+                                className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded shadow flex items-center justify-center gap-2 transition w-full md:w-auto"
+                            >
+                                <Send className="w-4 h-4" /> Hantar
+                            </button>
+
+                             {/* Divider */}
+                            <div className="hidden md:block w-[1px] bg-gray-300 mx-1 h-auto"></div>
+
                             {previewMode === 'standard' ? (
                                 <>
                                     <button 
@@ -251,7 +312,7 @@ const App: React.FC = () => {
                                         disabled={isSaving}
                                         className="bg-gray-700 hover:bg-gray-800 text-white font-medium py-2 px-4 rounded shadow flex items-center justify-center gap-2 transition w-full md:w-auto"
                                     >
-                                        <Download className="w-4 h-4" /> Export PDF
+                                        <Download className="w-4 h-4" /> PDF
                                     </button>
                                 </>
                             ) : (
@@ -260,7 +321,7 @@ const App: React.FC = () => {
                                     disabled={isSaving}
                                     className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-6 rounded shadow flex items-center justify-center gap-2 transition w-full md:w-auto"
                                 >
-                                    <Download className="w-4 h-4" /> Muat Turun Poster (PNG)
+                                    <Download className="w-4 h-4" /> Poster (PNG)
                                 </button>
                             )}
                         </div>
