@@ -10,8 +10,7 @@ const PosterPreview = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
   const mainImage = data.gambar[0] || "https://placehold.co/600x400/e2e8f0/94a3b8?text=Tiada+Gambar";
   const subImages = data.gambar.slice(1, 4);
   
-  // URL Gambar Bangunan Sekolah - Ganti URL ini dengan URL sebenar gambar sekolah anda
-  // Nota: Gunakan gambar yang cerah untuk hasil terbaik
+  // URL Gambar Bangunan Sekolah - Updated to user provided image
   const headerBg = "https://iili.io/frIU2CG.jpg"; 
 
   return (
@@ -35,18 +34,18 @@ const PosterPreview = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
                 <img 
                     src={headerBg} 
                     alt="Latar Belakang Sekolah" 
-                    className="w-full h-full object-cover opacity-100" // Increased opacity
-                    style={{ objectPosition: 'center 30%' }}
+                    className="w-full h-full object-cover opacity-100" 
+                    style={{ objectPosition: 'center 40%' }} // Adjusted position to center the building
                 />
-                {/* Gradient Overlay - Adjusted to be clearer on the right side for the building to show */}
-                <div className="absolute inset-0 bg-gradient-to-r from-brand-darkRed via-brand-red/85 to-transparent"></div>
+                {/* Gradient Overlay - Optimized for text readability while showing image */}
+                <div className="absolute inset-0 bg-gradient-to-r from-brand-darkRed via-brand-red/80 to-transparent"></div>
                 <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 mix-blend-overlay"></div>
             </div>
 
             {/* Content Container */}
             <div className="relative z-10 h-full flex items-center px-8 gap-5 pt-2">
                 
-                {/* LOGO SEKOLAH - TANPA BACKGROUND PUTIH */}
+                {/* LOGO SEKOLAH */}
                 <div className="shrink-0 transform -rotate-1">
                      <img 
                         src="https://iili.io/fv9OFtt.md.png" 
@@ -68,7 +67,7 @@ const PosterPreview = forwardRef<HTMLDivElement, Props>(({ data }, ref) => {
                         SMA MAIWP LABUAN
                     </h2>
                     
-                    {/* TAJUK PROGRAM - DIPERBESARKAN */}
+                    {/* TAJUK PROGRAM */}
                     <h1 className="text-3xl font-black uppercase leading-[0.95] tracking-tight text-white drop-shadow-xl line-clamp-2 border-l-4 border-brand-gold pl-3 text-shadow-md">
                         {data.tajukProgram || "TAJUK PROGRAM DI SINI"}
                     </h1>
