@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { OPRData, UnitType } from './types';
 import OPRForm from './components/OPRForm';
 import OPRPreview from './components/OPRPreview';
+import PosterPreview from './components/PosterPreview'; // Import new component
 import Dashboard from './components/Dashboard';
-import { saveReport, getDashboardStats, uploadReportToCloud } from './services/storageService';
+import { saveReport, getDashboardStats } from './services/storageService';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
-import { LayoutDashboard, PlusCircle, ArrowLeft, Download, CheckCircle, Save, Share2, Loader2, Link } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, ArrowLeft, Download, CheckCircle, Save, FileText, Image as ImageIcon } from 'lucide-react';
 
 const INITIAL_DATA: OPRData = {
   id: '',
@@ -30,12 +31,14 @@ const INITIAL_DATA: OPRData = {
 
 const App: React.FC = () => {
   const [view, setView] = useState<'dashboard' | 'form' | 'preview'>('dashboard');
+  const [previewMode, setPreviewMode] = useState<'standard' | 'poster'>('standard'); // Toggle state
   const [currentData, setCurrentData] = useState<OPRData>(INITIAL_DATA);
   const [stats, setStats] = useState(getDashboardStats());
   const [isSaving, setIsSaving] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
   
   const printRef = useRef<HTMLDivElement>(null);
+  const posterRef = useRef<HTMLDivElement>(null); // Ref for poster
 
   useEffect(() => {
     // Refresh stats when view changes to dashboard
@@ -52,6 +55,7 @@ const App: React.FC = () => {
 
   const handleCreateNew = () => {
     setCurrentData({ ...INITIAL_DATA, id: Date.now().toString() });
+    setPreviewMode('standard'); // Default to standard
     setView('form');
   };
 
@@ -63,6 +67,7 @@ const App: React.FC = () => {
   // Function to view existing report from Dashboard
   const handleViewReport = (data: OPRData) => {
     setCurrentData(data);
+    setPreviewMode('standard');
     setView('preview');
   };
 
@@ -75,7 +80,7 @@ const App: React.FC = () => {
             scale: 2,
             useCORS: true,
             logging: false,
-            windowWidth: 210 * 3.7795275591, // A4 width in px (approx) to ensure consistent text wrap
+            windowWidth: 210 * 3.7795275591, 
         });
         const imgData = canvas.toDataURL('image/png');
         
@@ -85,8 +90,6 @@ const App: React.FC = () => {
         
         pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
         
-        // Return base64 string (without the data:application/pdf;base64, prefix if used with pdf.output('datauristring'))
-        // We use output('datauristring') which includes prefix, we will strip it in service if needed
         return pdf.output('datauristring');
       } catch (e) {
           console.error("PDF Generation Error", e);
@@ -114,48 +117,28 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSaveToDrive = async () => {
+  const handleDownloadPoster = async () => {
+    if (!posterRef.current) return;
     setIsSaving(true);
     try {
-        // 1. Generate PDF
-        const pdfBase64 = await generatePDFBase64();
-        if (!pdfBase64) throw new Error("Gagal menjana PDF untuk upload.");
-
-        // 2. Upload to Google Drive & Save to Sheet via Web App
-        const success = await uploadReportToCloud(currentData, pdfBase64);
-
-        if (success) {
-            showToast("Berjaya! Data disimpan ke Google Sheet & Drive.");
-            setTimeout(() => setView('dashboard'), 2000);
-        }
+        const element = posterRef.current;
+        // High scale for crisp text on mobile
+        const canvas = await html2canvas(element, { 
+            scale: 2,
+            useCORS: true,
+            backgroundColor: null
+        });
+        
+        const image = canvas.toDataURL("image/png", 1.0);
+        const link = document.createElement("a");
+        const filename = `Poster_${currentData.tajukProgram.replace(/\s/g, '_')}.png`;
+        link.download = filename;
+        link.href = image;
+        link.click();
+        showToast("Poster Berjaya Dimuat Turun!");
     } catch (e) {
-        console.error(e);
-        alert("Ralat semasa proses penyimpanan.");
-    } finally {
-        setIsSaving(false);
-    }
-  };
-
-  const handleShare = async () => {
-    setIsSaving(true);
-    try {
-        const pdfBase64 = await generatePDFBase64();
-        if (pdfBase64) {
-             // Convert DataURI to Blob
-             const base64Response = await fetch(pdfBase64);
-             const blob = await base64Response.blob();
-             const url = URL.createObjectURL(blob);
-
-             // Copy to clipboard
-             await navigator.clipboard.writeText(url);
-             
-             // Feedback Alert
-             alert(`Pautan PDF Dijana & Disalin!\n\nURL: ${url}\n\nNota: Pautan ini adalah 'Local Blob' dan boleh dibuka di tab baru browser ini.`);
-             showToast("Pautan disalin ke clipboard!");
-        }
-    } catch (e) {
-        console.error(e);
-        alert("Ralat semasa menjana pautan perkongsian.");
+        console.error("Poster Error", e);
+        alert("Ralat semasa menjana Poster.");
     } finally {
         setIsSaving(false);
     }
@@ -235,48 +218,63 @@ const App: React.FC = () => {
 
         {view === 'preview' && (
             <div className="flex flex-col items-center gap-6">
-                 {/* Toolbar */}
-                 <div className="w-full flex flex-col md:flex-row justify-between items-center max-w-4xl gap-4 p-4 bg-white rounded shadow-sm border border-red-100">
-                     <button onClick={() => setView('form')} className="text-gray-600 hover:text-black flex items-center gap-2 text-sm font-medium">
-                        <ArrowLeft className="w-4 h-4" /> Edit Semula
-                     </button>
-                     
-                     <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
-                         <button 
-                            onClick={handleDownloadPDF}
-                            disabled={isSaving}
-                            className="bg-gray-700 hover:bg-gray-800 text-white font-medium py-2 px-4 rounded shadow flex items-center justify-center gap-2 transition"
-                         >
-                            <Download className="w-4 h-4" />
-                            Save & Export PDF
-                         </button>
-                         <button 
-                            onClick={handleSaveToDrive}
-                            disabled={isSaving}
-                            className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded shadow flex items-center justify-center gap-2 transition"
-                         >
-                            {isSaving ? (
+                 {/* Toolbar with Mode Toggle */}
+                 <div className="w-full max-w-4xl space-y-4">
+                    
+                    {/* Mode Toggle Buttons */}
+                    <div className="flex justify-center p-1 bg-white border border-gray-200 rounded-full w-max mx-auto shadow-sm">
+                        <button
+                            onClick={() => setPreviewMode('standard')}
+                            className={`px-6 py-2 rounded-full text-sm font-medium transition flex items-center gap-2 ${previewMode === 'standard' ? 'bg-brand-red text-white shadow' : 'text-gray-500 hover:bg-gray-50'}`}
+                        >
+                            <FileText className="w-4 h-4" /> Dokumen Rasmi (A4)
+                        </button>
+                        <button
+                            onClick={() => setPreviewMode('poster')}
+                            className={`px-6 py-2 rounded-full text-sm font-medium transition flex items-center gap-2 ${previewMode === 'poster' ? 'bg-brand-gold text-black shadow' : 'text-gray-500 hover:bg-gray-50'}`}
+                        >
+                            <ImageIcon className="w-4 h-4" /> Poster Kreatif (PNG)
+                        </button>
+                    </div>
+
+                    {/* Action Bar */}
+                    <div className="flex flex-col md:flex-row justify-between items-center gap-4 p-4 bg-white rounded shadow-sm border border-red-100">
+                        <button onClick={() => setView('form')} className="text-gray-600 hover:text-black flex items-center gap-2 text-sm font-medium">
+                            <ArrowLeft className="w-4 h-4" /> Edit Semula
+                        </button>
+                        
+                        <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                            {previewMode === 'standard' ? (
                                 <>
-                                    <Loader2 className="w-4 h-4 animate-spin" /> Sedang Upload...
+                                    <button 
+                                        onClick={handleDownloadPDF}
+                                        disabled={isSaving}
+                                        className="bg-gray-700 hover:bg-gray-800 text-white font-medium py-2 px-4 rounded shadow flex items-center justify-center gap-2 transition w-full md:w-auto"
+                                    >
+                                        <Download className="w-4 h-4" /> Export PDF
+                                    </button>
                                 </>
                             ) : (
-                                <>
-                                    <Share2 className="w-4 h-4" /> Simpan ke Google Drive
-                                </>
+                                <button 
+                                    onClick={handleDownloadPoster}
+                                    disabled={isSaving}
+                                    className="bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-6 rounded shadow flex items-center justify-center gap-2 transition w-full md:w-auto"
+                                >
+                                    <Download className="w-4 h-4" /> Muat Turun Poster (PNG)
+                                </button>
                             )}
-                         </button>
-                         <button 
-                            onClick={handleShare}
-                            disabled={isSaving}
-                            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded shadow flex items-center justify-center gap-2 transition"
-                         >
-                             <Link className="w-4 h-4" /> Kongsi Pautan
-                         </button>
-                     </div>
+                        </div>
+                    </div>
                  </div>
                  
-                 {/* The Preview Component (Visible for Print logic) */}
-                 <OPRPreview ref={printRef} data={currentData} />
+                 {/* Conditional Rendering of Preview Components */}
+                 <div className={`${previewMode === 'standard' ? 'block' : 'hidden'} w-full`}>
+                    <OPRPreview ref={printRef} data={currentData} />
+                 </div>
+                 
+                 <div className={`${previewMode === 'poster' ? 'block' : 'hidden'} w-full`}>
+                    <PosterPreview ref={posterRef} data={currentData} />
+                 </div>
             </div>
         )}
       </main>
